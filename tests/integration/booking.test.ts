@@ -2,10 +2,7 @@ import app, { init } from "@/app";
 import { prisma } from "@/config";
 import faker from "@faker-js/faker";
 import { TicketStatus } from "@prisma/client";
-import e from "express";
 import httpStatus from "http-status";
-import { Http2ServerRequest } from "http2";
-import { number } from "joi";
 import * as jwt from "jsonwebtoken";
 import supertest from "supertest";
 import {
@@ -17,6 +14,7 @@ import {
     generateCreditCardData,
     createTicketTypeWithHotel,
     createTicketTypeRemote,
+    createTicketTypeWithoutHotel,
     createHotel,
     createRoomWithHotelId,
     sellOutRoom,
@@ -93,7 +91,7 @@ describe("POST /booking", () => {
         const response = await (await server.post("/booking").set("Authorization", `Bearer ${token}`).send({ roomId: createdRoom.id }));
 
         expect(response.status).toBe(httpStatus.FORBIDDEN);
-    })
+    });
 
     it("should respond with status 403 if user's ticket is remote", async () => {
         const user = await createUser();
@@ -109,7 +107,23 @@ describe("POST /booking", () => {
         const response = await (await server.post("/booking").set("Authorization", `Bearer ${token}`).send({ roomId: createdRoom.id }));
 
         expect(response.status).toBe(httpStatus.FORBIDDEN);
-    })
+    });
+
+    it("should respond with status 403 if user's ticket does not include Hotel", async () => {
+        const user = await createUser();
+        const token = await generateValidToken(user);
+        const enrollment = await createEnrollmentWithAddress(user);
+        const ticketType = await createTicketTypeWithoutHotel();
+        const ticket = await createTicket(enrollment.id, ticketType.id, TicketStatus.PAID);
+
+        const createdHotel = await createHotel();
+
+        const createdRoom = await createRoomWithHotelId(createdHotel.id);
+
+        const response = await (await server.post("/booking").set("Authorization", `Bearer ${token}`).send({ roomId: createdRoom.id }));
+
+        expect(response.status).toBe(httpStatus.FORBIDDEN);
+    });
 
     it("should respond with status 403 if the room is completely full", async () => {
         const user = await createUser();
